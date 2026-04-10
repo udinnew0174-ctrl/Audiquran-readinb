@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=yes">
+  <title>IlmQuran | Bacaan & Tafsir Elegan</title>
+  <!-- Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&family=Amiri:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="container">
+  <div class="app-header">
+    <h1>۞ القُرْآن   ۞</h1>
+    <p>Bacaan mulia | Tafsir & Audio Full Surah</p>
+  </div>
+
+  <!-- Tampilan Daftar Surat -->
+  <div id="listView">
+    <div class="search-box">
+      <input type="text" id="searchSurah" placeholder="Cari surat (nama latin / arti) ..." autocomplete="off">
+    </div>
+    <div id="surahListContainer" class="surah-grid">
+      <div class="loading-spinner">Memuat daftar surah...</div>
+    </div>
+  </div>
+
+  <!-- Tampilan Detail Surat -->
+  <div id="detailView" class="detail-view hidden">
+    <button class="back-btn" id="backToListBtn">
+      <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M19 12H5M12 19l-7-7 7-7"/>
+      </svg>
+      Kembali ke daftar
+    </button>
+    <div id="detailContent">
+      <div class="loading-spinner">Memuat ayat & tafsir...</div>
+    </div>
+  </div>
+</div>
+
+<!-- Config & Scripts -->
+<script src="config.js"></script>
+<script src="script.js"></script>
+</body>
+</html>
