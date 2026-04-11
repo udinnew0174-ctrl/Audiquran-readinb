@@ -19,8 +19,8 @@ let currentSurahNomor = null;
 let currentSurahAyatData = [];
 let cachedAudioFull = null;
 
-// UI elements
-let seekSlider, currentTimeSpan, durationSpan, playPauseBtn;
+// UI elements untuk progress bar
+let seekSlider, currentTimeSpan, durationSpan, playBtn;
 let isPlayingFull = false;
 
 // ==================== UTILITIES ====================
@@ -88,7 +88,7 @@ function stopAllAudio() {
     currentAudio = null;
   }
   isPlayingFull = false;
-  if (playPauseBtn) playPauseBtn.textContent = '▶';
+  if (playBtn) playBtn.textContent = '▶';
   const nowPlaying = document.getElementById('nowPlayingStatus');
   if (nowPlaying) nowPlaying.innerText = '';
 }
@@ -103,8 +103,8 @@ function playSingleAudio(url) {
 }
 
 function setupProgressForAudio(audio) {
-  const sliderContainer = document.querySelector('.slider-container');
-  if (sliderContainer) sliderContainer.style.display = 'flex';
+  const timeSliderContainer = document.querySelector('.time-slider-container');
+  if (timeSliderContainer) timeSliderContainer.style.display = 'flex';
 
   const updateUI = () => {
     if (!audio || !seekSlider || !currentTimeSpan || !durationSpan) return;
@@ -129,11 +129,11 @@ function setupProgressForAudio(audio) {
   });
   audio.addEventListener('play', () => {
     isPlayingFull = true;
-    if (playPauseBtn) playPauseBtn.textContent = '⏸';
+    if (playBtn) playBtn.textContent = '⏸';
   });
   audio.addEventListener('pause', () => {
     isPlayingFull = false;
-    if (playPauseBtn) playPauseBtn.textContent = '▶';
+    if (playBtn) playBtn.textContent = '▶';
   });
 
   if (seekSlider) {
@@ -342,9 +342,9 @@ async function loadSurahDetail(nomor) {
         <div class="surah-desc">${escapeHtml(deskripsiClean)}</div>
 
         <div class="audio-player">
-          <div class="player-main-row">
-            <button id="playSurahBtn" class="play-surah-btn">▶</button>
-            <div class="slider-container">
+          <div class="player-row">
+            <button id="playSurahBtn" class="play-btn">▶</button>
+            <div class="time-slider-container">
               <span class="current-time" id="currentTime">0:00</span>
               <input type="range" id="seekSlider" class="seek-slider" value="0" min="0" max="100" step="0.1">
               <span class="duration-time" id="durationTime">0:00</span>
@@ -364,9 +364,8 @@ async function loadSurahDetail(nomor) {
     seekSlider = document.getElementById('seekSlider');
     currentTimeSpan = document.getElementById('currentTime');
     durationSpan = document.getElementById('durationTime');
-    playPauseBtn = document.getElementById('playSurahBtn');
+    playBtn = document.getElementById('playSurahBtn');
 
-    const playBtn = document.getElementById('playSurahBtn');
     const qariSelect = document.getElementById('qariSelect');
 
     if (playBtn) {
