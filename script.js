@@ -1,51 +1,61 @@
-// ---------- GLOBAL STATE & DOM ----------
-const listView = document.getElementById("listView");
-const detailView = document.getElementById("detailView");
-const surahContainer = document.getElementById("surahListContainer");
-const searchInput = document.getElementById("searchSurah");
-const detailContent = document.getElementById("detailContent");
-const backBtn = document.getElementById("backToListBtn");
+// ==================== KONFIGURASI & GLOBAL STATE ====================
+const listView = document.getElementById('listView');
+const detailView = document.getElementById('detailView');
+const surahContainer = document.getElementById('surahListContainer');
+const searchInput = document.getElementById('searchSurah');
+const detailContent = document.getElementById('detailContent');
+const backBtn = document.getElementById('backToListBtn');
 
 let allSurahs = [];
-let currentFilter = "";
+let currentFilter = '';
 let activeAbortController = null;
 let isLoadingDetail = false;
 let debounceTimer = null;
 
-let currentAudioObj = null;           // untuk audio per ayat atau full surah
-let currentReciter = '05';
+// Audio state
+let currentAudio = null;               // objek Audio aktif (untuk full surah atau per ayat)
+let currentReciter = '05';             // default: Misyari Rasyid Al-Afasi
 let currentSurahNomor = null;
 let currentSurahAyatData = [];
 let cachedAudioFull = null;
 
-// Elemen UI audio yang akan dibuat dinamis
-let audioProgressContainer = null;
-let seekSlider = null;
-let currentTimeSpan = null;
-let durationSpan = null;
-let playPauseBtn = null;
+// UI elements untuk progress bar (full surah)
+let progressContainer, seekSlider, currentTimeSpan, durationSpan, playPauseBtn;
 let isPlayingFull = false;
 
-// ---------- UTILITIES (sama seperti sebelumnya) ----------
+// ==================== UTILITIES ====================
 function escapeHtml(str) {
-  if (!str) return "";
+  if (!str) return '';
   return str.replace(/[&<>]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[m]));
 }
+
 function stripHtml(html) {
-  if (!html) return "";
-  const tmp = document.createElement("div");
+  if (!html) return '';
+  const tmp = document.createElement('div');
   tmp.innerHTML = html;
-  return tmp.textContent || tmp.innerText || "";
-}
-function getPlaceReveal(surah) {
-  if (surah.tempatTurun && (surah.tempatTurun === "Mekah" || surah.tempatTurun === "Madinah")) return surah.tempatTurun;
-  const makkiyah = [1,6,7,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114];
-  return makkiyah.includes(surah.nomor) ? "Mekah" : "Madinah";
+  return tmp.textContent || tmp.innerText || '';
 }
 
-// ---------- RENDER SURAH LIST (tidak berubah) ----------
+function formatTime(seconds) {
+  if (isNaN(seconds) || seconds < 0) return '0:00';
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+}
+
+function getPlaceReveal(surah) {
+  if (surah.tempatTurun === 'Mekah' || surah.tempatTurun === 'Madinah') return surah.tempatTurun;
+  const makkiyah = [1,6,7,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114];
+  return makkiyah.includes(surah.nomor) ? 'Mekah' : 'Madinah';
+}
+
+// ==================== RENDER DAFTAR SURAH ====================
 function renderSurahList() {
-  if (!allSurahs.length) { surahContainer.innerHTML = `<div class="loading-spinner">Memuat data surah...</div>`; return; }
+  if (!allSurahs.length) {
+    surahContainer.innerHTML = `<div class="loading-spinner">Memuat data surah...</div>`;
+    return;
+  }
+
   const filterLower = currentFilter.toLowerCase().trim();
   let filtered = allSurahs;
   if (filterLower) {
@@ -55,12 +65,20 @@ function renderSurahList() {
       (s.nama && s.nama.toLowerCase().includes(filterLower))
     );
   }
-  if (filtered.length === 0) { surahContainer.innerHTML = `<div class="error-msg">✨ Tidak ditemukan surat dengan kata "${escapeHtml(currentFilter)}"</div>`; return; }
+
+  if (filtered.length === 0) {
+    surahContainer.innerHTML = `<div class="error-msg">✨ Tidak ditemukan surat dengan kata "${escapeHtml(currentFilter)}"</div>`;
+    return;
+  }
+
   surahContainer.innerHTML = filtered.map(surah => `
     <div class="surah-card" data-surah-id="${surah.nomor}">
       <div class="surah-info">
         <span class="surah-number">${surah.nomor}. ${surah.tempatTurun || getPlaceReveal(surah)} • ${surah.jumlahAyat} ayat</span>
-        <div class="surah-name"><span class="arabic-name">${escapeHtml(surah.nama)}</span><span class="latin-name">${escapeHtml(surah.namaLatin)}</span></div>
+        <div class="surah-name">
+          <span class="arabic-name">${escapeHtml(surah.nama)}</span>
+          <span class="latin-name">${escapeHtml(surah.namaLatin)}</span>
+        </div>
         <div class="surah-meta"><span>${escapeHtml(surah.arti)}</span></div>
       </div>
       <div class="surah-badge">Baca →</div>
@@ -68,42 +86,34 @@ function renderSurahList() {
   `).join('');
 }
 
-// ---------- AUDIO HANDLING (diperbarui dengan seek & time) ----------
+// ==================== AUDIO HANDLING ====================
 function stopAllAudio() {
-  if (currentAudioObj) {
-    currentAudioObj.pause();
-    if (currentAudioObj._progressInterval) clearInterval(currentAudioObj._progressInterval);
-    currentAudioObj = null;
+  if (currentAudio) {
+    currentAudio.pause();
+    if (currentAudio._progressInterval) clearInterval(currentAudio._progressInterval);
+    currentAudio = null;
   }
   isPlayingFull = false;
   if (playPauseBtn) playPauseBtn.textContent = '▶ Putar Surah (Full)';
-  const nowPlayingSpan = document.getElementById('nowPlayingStatus');
-  if (nowPlayingSpan) nowPlayingSpan.innerText = '';
+  const nowPlaying = document.getElementById('nowPlayingStatus');
+  if (nowPlaying) nowPlaying.innerText = '';
 }
 
 function playSingleAudio(url) {
-  stopAllAudio();
+  stopAllAudio(); // hentikan audio full jika sedang berjalan
   const audio = new Audio(url);
-  currentAudioObj = audio;
-  audio.play().catch(err => console.warn("Audio play error:", err));
-  audio.onended = () => { if (currentAudioObj === audio) currentAudioObj = null; };
-  audio.onerror = () => { if (currentAudioObj === audio) currentAudioObj = null; };
+  currentAudio = audio;
+  audio.play().catch(err => console.warn('Audio play error:', err));
+  audio.onended = () => { if (currentAudio === audio) currentAudio = null; };
+  audio.onerror = () => { if (currentAudio === audio) currentAudio = null; };
 }
 
-// Fungsi format waktu (detik -> mm:ss)
-function formatTime(seconds) {
-  if (isNaN(seconds)) return '0:00';
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
-  return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
-}
+// Setup progress bar untuk audio full surah
+function setupProgressForAudio(audio) {
+  if (!progressContainer) return;
+  progressContainer.style.display = 'flex';
 
-// Setup progress bar dan event untuk audio full
-function setupAudioProgress(audio) {
-  if (!audioProgressContainer) return;
-  audioProgressContainer.style.display = 'flex';
-  
-  const updateProgress = () => {
+  const updateUI = () => {
     if (!audio || !seekSlider || !currentTimeSpan || !durationSpan) return;
     const current = audio.currentTime || 0;
     const duration = audio.duration || 0;
@@ -112,109 +122,101 @@ function setupAudioProgress(audio) {
     currentTimeSpan.textContent = formatTime(current);
     if (duration && !isNaN(duration)) {
       durationSpan.textContent = formatTime(duration);
-    } else {
-      durationSpan.textContent = '0:00';
     }
   };
 
-  // Hapus interval lama jika ada
   if (audio._progressInterval) clearInterval(audio._progressInterval);
-  audio._progressInterval = setInterval(updateProgress, 200);
-  
-  audio.addEventListener('loadedmetadata', updateProgress);
-  audio.addEventListener('timeupdate', updateProgress);
+  audio._progressInterval = setInterval(updateUI, 200);
+
+  audio.addEventListener('loadedmetadata', updateUI);
+  audio.addEventListener('timeupdate', updateUI);
   audio.addEventListener('ended', () => {
-    updateProgress();
+    updateUI();
     stopAllAudio();
   });
   audio.addEventListener('play', () => {
     isPlayingFull = true;
     if (playPauseBtn) playPauseBtn.textContent = '⏸ Pause';
-    updateProgress();
   });
   audio.addEventListener('pause', () => {
     isPlayingFull = false;
     if (playPauseBtn) playPauseBtn.textContent = '▶ Putar Surah (Full)';
   });
-  
-  // Seek
+
   if (seekSlider) {
-    seekSlider.addEventListener('input', (e) => {
-      if (audio) {
-        audio.currentTime = parseFloat(e.target.value);
-        updateProgress();
-      }
-    });
+    seekSlider.oninput = (e) => {
+      if (audio) audio.currentTime = parseFloat(e.target.value);
+    };
   }
 }
 
 function playFullSurah() {
-  if (!cachedAudioFull) { alert("Data audio tidak tersedia."); return; }
-  const url = cachedAudioFull[currentReciter];
-  if (!url) { alert(`Audio full surah untuk qari ${RECITER_MAP[currentReciter] || currentReciter} tidak tersedia.`); return; }
-  
-  // Jika sudah ada audio yang sama dan sedang pause, resume
-  if (currentAudioObj && currentAudioObj.src === url && currentAudioObj.paused) {
-    currentAudioObj.play();
+  if (!cachedAudioFull) {
+    alert('Data audio tidak tersedia.');
     return;
   }
-  
+  const url = cachedAudioFull[currentReciter];
+  if (!url) {
+    alert(`Audio full surah untuk qari ${RECITER_MAP[currentReciter] || currentReciter} tidak tersedia.`);
+    return;
+  }
+
+  // Jika sudah ada audio yang sama dan sedang pause, resume
+  if (currentAudio && currentAudio.src === url && currentAudio.paused) {
+    currentAudio.play();
+    return;
+  }
+
   stopAllAudio();
   const audio = new Audio(url);
-  currentAudioObj = audio;
-  setupAudioProgress(audio);
-  
-  const nowPlayingSpan = document.getElementById('nowPlayingStatus');
-  if (nowPlayingSpan) nowPlayingSpan.innerText = `🎧 Memutar full surah (${RECITER_MAP[currentReciter] || currentReciter})`;
-  
+  currentAudio = audio;
+  setupProgressForAudio(audio);
+
+  const nowPlaying = document.getElementById('nowPlayingStatus');
+  if (nowPlaying) nowPlaying.innerText = `🎧 Memutar full surah (${RECITER_MAP[currentReciter] || currentReciter})`;
+
   audio.play().catch(err => {
-    console.warn("Full surah play error:", err);
-    if (nowPlayingSpan) nowPlayingSpan.innerText = 'Gagal memutar audio';
+    console.warn('Full surah play error:', err);
+    if (nowPlaying) nowPlaying.innerText = 'Gagal memutar audio';
   });
-  
-  audio.onerror = () => {
-    if (currentAudioObj === audio) currentAudioObj = null;
-    if (nowPlayingSpan) nowPlayingSpan.innerText = '❌ Error audio';
-  };
 }
 
 function pauseFullSurah() {
-  if (currentAudioObj) {
-    currentAudioObj.pause();
-  }
+  if (currentAudio) currentAudio.pause();
 }
 
-function smoothScrollToTop() {
-  try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch(e) { window.scrollTo(0, 0); }
-}
-
+// Update audio URL per ayat saat qari diganti
 async function updateAudioForReciter(reciterKey) {
   if (!currentSurahAyatData.length) return;
   currentReciter = reciterKey;
+
   for (let ayat of currentSurahAyatData) {
     const ayatNum = ayat.nomorAyat;
     const card = document.querySelector(`.ayat-card[data-ayat-id="${currentSurahNomor}-${ayatNum}"]`);
     if (!card) continue;
-    const btn = card.querySelector('.audio-btn');
-    if (ayat.audio && typeof ayat.audio === 'object') {
-      const newUrl = ayat.audio[reciterKey] || Object.values(ayat.audio)[0] || "";
-      if (btn && newUrl) btn.setAttribute('data-audio', newUrl);
-      else if (btn && !newUrl) btn.remove();
-      else if (!btn && newUrl) {
-        const newBtn = document.createElement('button');
-        newBtn.className = 'audio-btn';
-        newBtn.setAttribute('data-audio', newUrl);
-        newBtn.innerHTML = '🔊 Putar Audio';
-        card.insertBefore(newBtn, card.querySelector('.arabic-text'));
-      }
+    let btn = card.querySelector('.audio-btn');
+    const audioObj = ayat.audio || {};
+    const newUrl = audioObj[reciterKey] || Object.values(audioObj)[0] || '';
+
+    if (btn) {
+      if (newUrl) btn.setAttribute('data-audio', newUrl);
+      else btn.remove();
+    } else if (newUrl) {
+      btn = document.createElement('button');
+      btn.className = 'audio-btn';
+      btn.setAttribute('data-audio', newUrl);
+      btn.innerHTML = '🔊 Putar Audio';
+      const arabicEl = card.querySelector('.arabic-text');
+      card.insertBefore(btn, arabicEl);
     }
   }
+
   stopAllAudio();
   const nowSpan = document.getElementById('nowPlayingStatus');
   if (nowSpan) nowSpan.innerText = `Qari berubah ke ${RECITER_MAP[reciterKey] || reciterKey}. Silakan putar ulang.`;
 }
 
-// ---------- LOAD SURAH DETAIL (ditambahkan progress bar) ----------
+// ==================== LOAD DETAIL SURAH ====================
 async function loadSurahDetail(nomor) {
   if (isLoadingDetail) return;
   stopAllAudio();
@@ -223,84 +225,140 @@ async function loadSurahDetail(nomor) {
   const signal = activeAbortController.signal;
   isLoadingDetail = true;
   currentSurahNomor = nomor;
-  listView.classList.add("hidden");
-  detailView.classList.remove("hidden");
+
+  listView.classList.add('hidden');
+  detailView.classList.remove('hidden');
   detailContent.innerHTML = `<div class="loading-spinner">⏳ Membuka Surat, memohon berkah...</div>`;
 
   try {
     const timeoutId = setTimeout(() => activeAbortController.abort(), 15000);
-    const [detailRes, tafsirRes] = await Promise.all([fetch(API_SURAH_DETAIL(nomor), { signal }), fetch(API_TAFSIR(nomor), { signal })]);
+    const [detailRes, tafsirRes] = await Promise.all([
+      fetch(API_SURAH_DETAIL(nomor), { signal }),
+      fetch(API_TAFSIR(nomor), { signal })
+    ]);
     clearTimeout(timeoutId);
+
     if (!detailRes.ok) throw new Error(`Gagal memuat surat (${detailRes.status})`);
     const detailJson = await detailRes.json();
-    if (detailJson.code !== 200 || !detailJson.data) throw new Error("Data surat tidak valid");
+    if (detailJson.code !== 200 || !detailJson.data) throw new Error('Data surat tidak valid');
+
     const surah = detailJson.data;
     const ayatArray = surah.ayat || [];
     currentSurahAyatData = ayatArray;
     cachedAudioFull = surah.audioFull || {};
-    if (!cachedAudioFull[currentReciter] && Object.keys(cachedAudioFull).length > 0) {
-      currentReciter = Object.keys(cachedAudioFull)[0];
+
+    // Pilih qari pertama yang tersedia jika currentReciter tidak ada
+    const available = Object.keys(cachedAudioFull).filter(k => RECITER_MAP[k]);
+    if (!cachedAudioFull[currentReciter] && available.length) {
+      currentReciter = available[0];
     }
 
+    // Ambil data tafsir
     let tafsirMap = new Map();
     if (tafsirRes.ok) {
       const tafsirJson = await tafsirRes.json();
-      if (tafsirJson.code === 200 && tafsirJson.data && Array.isArray(tafsirJson.data.tafsir)) {
-        tafsirJson.data.tafsir.forEach(item => { if (item.ayat && item.teks) tafsirMap.set(item.ayat, item.teks); });
+      if (tafsirJson.code === 200 && tafsirJson.data?.tafsir) {
+        tafsirJson.data.tafsir.forEach(item => {
+          if (item.ayat && item.teks) tafsirMap.set(item.ayat, item.teks);
+        });
       }
     }
-    
+
+    // Qari selector HTML
     let qariOptionsHtml = '';
-    const availableReciters = Object.keys(cachedAudioFull).filter(k => RECITER_MAP[k]);
-    if (availableReciters.length > 0) {
-      qariOptionsHtml = `<div class="qari-selector"><label>🎙️ Qari:</label><select id="qariSelect">${availableReciters.map(key => `<option value="${key}" ${key === currentReciter ? 'selected' : ''}>${RECITER_MAP[key] || key}</option>`).join('')}</select></div>`;
+    const reciterEntries = Object.entries(RECITER_MAP);
+    if (available.length) {
+      qariOptionsHtml = `
+        <div class="qari-selector">
+          <label>🎙️ Qari:</label>
+          <select id="qariSelect">
+            ${available.map(k => `<option value="${k}" ${k === currentReciter ? 'selected' : ''}>${RECITER_MAP[k]}</option>`).join('')}
+          </select>
+        </div>
+      `;
     } else {
-      qariOptionsHtml = `<div class="qari-selector"><label>🎙️ Qari:</label><select id="qariSelect">${Object.entries(RECITER_MAP).map(([key, name]) => `<option value="${key}" ${key === currentReciter ? 'selected' : ''}>${name}</option>`).join('')}</select></div>`;
+      qariOptionsHtml = `
+        <div class="qari-selector">
+          <label>🎙️ Qari:</label>
+          <select id="qariSelect">
+            ${reciterEntries.map(([k, name]) => `<option value="${k}" ${k === currentReciter ? 'selected' : ''}>${name}</option>`).join('')}
+          </select>
+        </div>
+      `;
     }
-    
+
+    // Render ayat
     let ayatHtml = '';
     const uniqueSeed = Date.now() + Math.random().toString(36);
     for (let ayat of ayatArray) {
-      const ayatNum = ayat.nomorAyat || 0;
-      const arab = ayat.teksArab || "";
-      const latin = ayat.teksLatin || "";
-      const indo = ayat.teksIndonesia || "";
-      const tafsirRaw = tafsirMap.get(ayatNum) || "";
-      const tafsirClean = tafsirRaw ? stripHtml(tafsirRaw) : "";
+      const ayatNum = ayat.nomorAyat;
+      const arab = ayat.teksArab || '';
+      const latin = ayat.teksLatin || '';
+      const indo = ayat.teksIndonesia || '';
+      const tafsirRaw = tafsirMap.get(ayatNum) || '';
+      const tafsirClean = tafsirRaw ? stripHtml(tafsirRaw) : '';
       const hasTafsir = tafsirClean.length > 0;
-      let audioUrl = "";
-      if (ayat.audio && typeof ayat.audio === 'object') {
-        audioUrl = ayat.audio[currentReciter] || Object.values(ayat.audio)[0] || "";
+
+      let audioUrl = '';
+      if (ayat.audio) {
+        audioUrl = ayat.audio[currentReciter] || Object.values(ayat.audio)[0] || '';
       }
+
       const uniqueId = `tafsir-full-${nomor}-${ayatNum}-${uniqueSeed}`;
-      let tafsirPreviewHtml = "", tafsirFullHtml = "", toggleButtonHtml = "";
+      let tafsirPreviewHtml = '', tafsirFullHtml = '', toggleButtonHtml = '';
+
       if (hasTafsir) {
         const previewLimit = 120;
         const needToggle = tafsirClean.length > previewLimit;
-        const previewText = needToggle ? tafsirClean.substring(0, previewLimit) + "…" : tafsirClean;
+        const previewText = needToggle ? tafsirClean.substring(0, previewLimit) + '…' : tafsirClean;
         tafsirPreviewHtml = `<div class="tafsir-preview">📖 Tafsir: ${escapeHtml(previewText)}</div>`;
         tafsirFullHtml = `<div id="${uniqueId}" class="tafsir-full">📖 Tafsir lengkap: ${escapeHtml(tafsirClean)}</div>`;
-        if (needToggle) toggleButtonHtml = `<button class="btn-toggle-tafsir" data-target="${uniqueId}">Selengkapnya</button>`;
-        else { tafsirFullHtml = `<div class="tafsir-full show">📖 Tafsir: ${escapeHtml(tafsirClean)}</div>`; tafsirPreviewHtml = ""; }
-      } else { tafsirPreviewHtml = `<div class="tafsir-preview">📖 Tafsir: (Tidak tersedia untuk ayat ini)</div>`; }
-      ayatHtml += `<div class="ayat-card" data-ayat-id="${nomor}-${ayatNum}"><div class="ayat-number">${ayatNum}</div>${audioUrl ? `<button class="audio-btn" data-audio="${escapeHtml(audioUrl)}">🔊 Putar Audio</button>` : ''}<div class="arabic-text">${escapeHtml(arab)}</div><div class="latin-text">${escapeHtml(latin)}</div><div class="translation">${escapeHtml(indo) || "Terjemahan belum tersedia"}</div><div class="tafsir-wrapper">${tafsirPreviewHtml}${tafsirFullHtml}${toggleButtonHtml}</div></div>`;
+        if (needToggle) {
+          toggleButtonHtml = `<button class="btn-toggle-tafsir" data-target="${uniqueId}">Selengkapnya</button>`;
+        } else {
+          tafsirFullHtml = `<div class="tafsir-full show">📖 Tafsir: ${escapeHtml(tafsirClean)}</div>`;
+          tafsirPreviewHtml = '';
+        }
+      } else {
+        tafsirPreviewHtml = `<div class="tafsir-preview">📖 Tafsir: (Tidak tersedia)</div>`;
+      }
+
+      ayatHtml += `
+        <div class="ayat-card" data-ayat-id="${nomor}-${ayatNum}">
+          <div class="ayat-number">${ayatNum}</div>
+          ${audioUrl ? `<button class="audio-btn" data-audio="${escapeHtml(audioUrl)}">🔊 Putar Audio</button>` : ''}
+          <div class="arabic-text">${escapeHtml(arab)}</div>
+          <div class="latin-text">${escapeHtml(latin)}</div>
+          <div class="translation">${escapeHtml(indo) || 'Terjemahan belum tersedia'}</div>
+          <div class="tafsir-wrapper">
+            ${tafsirPreviewHtml}
+            ${tafsirFullHtml}
+            ${toggleButtonHtml}
+          </div>
+        </div>
+      `;
     }
+
     const tempatTurun = surah.tempatTurun || getPlaceReveal(surah);
-    const deskripsiClean = surah.deskripsi ? stripHtml(surah.deskripsi).substring(0, 200) + (surah.deskripsi.length > 200 ? '...' : '') : `Surat ${surah.namaLatin} terdiri dari ${surah.jumlahAyat} ayat, diturunkan di ${tempatTurun}.`;
-    
-    // === Tambahkan progress bar container di sini ===
+    const deskripsiClean = surah.deskripsi
+      ? stripHtml(surah.deskripsi).substring(0, 200) + (surah.deskripsi.length > 200 ? '...' : '')
+      : `Surat ${surah.namaLatin} terdiri dari ${surah.jumlahAyat} ayat, diturunkan di ${tempatTurun}.`;
+
+    // Header detail dengan progress bar
     const fullHtml = `
       <div class="detail-header">
         <div class="surah-title-arabic">${escapeHtml(surah.nama)}</div>
         <div class="surah-title-latin">${escapeHtml(surah.namaLatin)} <span style="font-size:0.9rem;">• ${escapeHtml(surah.arti)}</span></div>
-        <div style="display: flex; justify-content: center; gap: 12px; margin: 8px 0;"><span class="surah-badge">${surah.jumlahAyat} Ayat</span><span class="surah-badge">${escapeHtml(tempatTurun)}</span></div>
+        <div style="display: flex; justify-content: center; gap: 12px; margin: 8px 0;">
+          <span class="surah-badge">${surah.jumlahAyat} Ayat</span>
+          <span class="surah-badge">${escapeHtml(tempatTurun)}</span>
+        </div>
         <div class="surah-desc">${escapeHtml(deskripsiClean)}</div>
         <div class="audio-controls">
           <button id="playSurahBtn" class="play-surah-btn">▶ Putar Surah (Full)</button>
           <button id="stopSurahBtn" class="stop-surah-btn">⏹ Stop</button>
           ${qariOptionsHtml}
         </div>
-        <!-- PROGRESS BAR & TIMELINE -->
         <div id="audioProgressContainer" class="audio-progress-container" style="display: none;">
           <span class="current-time" id="currentTime">0:00</span>
           <input type="range" id="seekSlider" class="seek-slider" value="0" min="0" max="100" step="0.1">
@@ -310,51 +368,72 @@ async function loadSurahDetail(nomor) {
       </div>
       <div class="ayat-list">${ayatHtml}</div>
     `;
+
     detailContent.innerHTML = fullHtml;
-    
+
     // Ambil referensi elemen progress
-    audioProgressContainer = document.getElementById('audioProgressContainer');
+    progressContainer = document.getElementById('audioProgressContainer');
     seekSlider = document.getElementById('seekSlider');
     currentTimeSpan = document.getElementById('currentTime');
     durationSpan = document.getElementById('durationTime');
-    
-    const playBtn = document.getElementById("playSurahBtn");
-    const stopBtn = document.getElementById("stopSurahBtn");
-    const qariSelect = document.getElementById("qariSelect");
-    playPauseBtn = playBtn;
-    
+    playPauseBtn = document.getElementById('playSurahBtn');
+
+    // Event listener untuk kontrol audio full
+    const playBtn = document.getElementById('playSurahBtn');
+    const stopBtn = document.getElementById('stopSurahBtn');
+    const qariSelect = document.getElementById('qariSelect');
+
     if (playBtn) {
       playBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        if (currentAudioObj && !currentAudioObj.paused) {
+        if (currentAudio && !currentAudio.paused) {
           pauseFullSurah();
         } else {
           playFullSurah();
         }
       });
     }
-    if (stopBtn) stopBtn.addEventListener('click', (e) => { e.stopPropagation(); stopAllAudio(); });
+    if (stopBtn) {
+      stopBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        stopAllAudio();
+      });
+    }
     if (qariSelect) {
       qariSelect.addEventListener('change', (e) => {
         const newReciter = e.target.value;
         if (newReciter !== currentReciter) updateAudioForReciter(newReciter);
       });
     }
-    smoothScrollToTop();
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
   } catch (err) {
     if (err.name === 'AbortError') return;
     console.error(err);
-    detailContent.innerHTML = `<div class="error-msg">⚠️ Gagal memuat surat: ${escapeHtml(err.message)}. Cek koneksi atau coba lagi.</div><button id="retryDetailBtn" class="back-btn" style="margin-top:1rem;">↻ Muat Ulang</button>`;
-    const retryBtn = document.getElementById("retryDetailBtn");
-    if (retryBtn) retryBtn.addEventListener('click', () => loadSurahDetail(nomor));
+    detailContent.innerHTML = `
+      <div class="error-msg">⚠️ Gagal memuat surat: ${escapeHtml(err.message)}. Cek koneksi atau coba lagi.</div>
+      <button id="retryDetailBtn" class="back-btn" style="margin-top:1rem;">↻ Muat Ulang</button>
+    `;
+    document.getElementById('retryDetailBtn')?.addEventListener('click', () => loadSurahDetail(nomor));
   } finally {
     isLoadingDetail = false;
-    if (activeAbortController) activeAbortController = null;
+    activeAbortController = null;
   }
 }
 
-// Event listener untuk audio per ayat dan toggle tafsir (tidak berubah)
+// ==================== EVENT LISTENERS ====================
+// Klik pada kartu surah
+surahContainer.addEventListener('click', (e) => {
+  const card = e.target.closest('.surah-card');
+  if (!card || isLoadingDetail) return;
+  const surahId = parseInt(card.dataset.surahId);
+  if (!isNaN(surahId)) loadSurahDetail(surahId);
+});
+
+// Klik pada tombol dalam detail (delegasi)
 detailContent.addEventListener('click', (e) => {
+  // Tombol audio per ayat
   const audioBtn = e.target.closest('.audio-btn');
   if (audioBtn) {
     e.stopPropagation();
@@ -362,44 +441,53 @@ detailContent.addEventListener('click', (e) => {
     if (url) playSingleAudio(url);
     return;
   }
+
+  // Tombol toggle tafsir
   const toggleBtn = e.target.closest('.btn-toggle-tafsir');
   if (toggleBtn) {
     e.stopPropagation();
     const targetId = toggleBtn.getAttribute('data-target');
-    if (targetId) {
-      const fullDiv = document.getElementById(targetId);
-      if (fullDiv) {
-        const wrapper = fullDiv.closest('.tafsir-wrapper');
-        const previewDiv = wrapper ? wrapper.querySelector('.tafsir-preview') : null;
-        const isExpanded = fullDiv.classList.contains('show');
-        if (!isExpanded) {
-          if (previewDiv) previewDiv.classList.add('hide-preview');
-          fullDiv.classList.add('show');
-          toggleBtn.textContent = 'Sembunyikan';
-        } else {
-          if (previewDiv) previewDiv.classList.remove('hide-preview');
-          fullDiv.classList.remove('show');
-          toggleBtn.textContent = 'Selengkapnya';
-        }
+    const fullDiv = document.getElementById(targetId);
+    if (fullDiv) {
+      const wrapper = fullDiv.closest('.tafsir-wrapper');
+      const previewDiv = wrapper?.querySelector('.tafsir-preview');
+      const isExpanded = fullDiv.classList.contains('show');
+      if (!isExpanded) {
+        previewDiv?.classList.add('hide-preview');
+        fullDiv.classList.add('show');
+        toggleBtn.textContent = 'Sembunyikan';
+      } else {
+        previewDiv?.classList.remove('hide-preview');
+        fullDiv.classList.remove('show');
+        toggleBtn.textContent = 'Selengkapnya';
       }
     }
   }
 });
 
-function backToList() {
+// Tombol kembali ke daftar
+backBtn.addEventListener('click', () => {
   if (isLoadingDetail) return;
   if (activeAbortController) activeAbortController.abort();
   stopAllAudio();
-  listView.classList.remove("hidden");
-  detailView.classList.add("hidden");
-  detailContent.innerHTML = "";
+  listView.classList.remove('hidden');
+  detailView.classList.add('hidden');
+  detailContent.innerHTML = '';
   isLoadingDetail = false;
   currentSurahAyatData = [];
   cachedAudioFull = null;
-}
-backBtn.addEventListener("click", backToList);
-searchInput.addEventListener("input", (e) => { if (debounceTimer) clearTimeout(debounceTimer); debounceTimer = setTimeout(() => { currentFilter = e.target.value; renderSurahList(); }, 250); });
+});
 
+// Pencarian surah dengan debounce
+searchInput.addEventListener('input', (e) => {
+  if (debounceTimer) clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(() => {
+    currentFilter = e.target.value;
+    renderSurahList();
+  }, 250);
+});
+
+// ==================== FETCH DAFTAR SURAH (RETRY) ====================
 async function fetchSurahListWithRetry(retries = 2) {
   try {
     const response = await fetch(API_SURAH_LIST);
@@ -408,18 +496,29 @@ async function fetchSurahListWithRetry(retries = 2) {
     if (result.code === 200 && Array.isArray(result.data)) {
       allSurahs = result.data;
       renderSurahList();
-    } else throw new Error("Format data tidak sesuai");
+    } else {
+      throw new Error('Format data tidak sesuai');
+    }
   } catch (err) {
     console.error(err);
     if (retries > 0) {
       surahContainer.innerHTML = `<div class="loading-spinner">Gagal memuat, mencoba ulang (${retries})...</div>`;
       setTimeout(() => fetchSurahListWithRetry(retries - 1), 1500);
     } else {
-      surahContainer.innerHTML = `<div class="error-msg">⚠️ Gagal memuat daftar surat. Periksa koneksi internet.</div><button id="retryListBtn" class="back-btn" style="margin:1rem auto; display:block;">Coba Lagi</button>`;
-      const retryBtn = document.getElementById("retryListBtn");
-      if (retryBtn) retryBtn.addEventListener('click', () => fetchSurahListWithRetry(2));
+      surahContainer.innerHTML = `
+        <div class="error-msg">⚠️ Gagal memuat daftar surat. Periksa koneksi internet.</div>
+        <button id="retryListBtn" class="back-btn" style="margin:1rem auto; display:block;">Coba Lagi</button>
+      `;
+      document.getElementById('retryListBtn')?.addEventListener('click', () => fetchSurahListWithRetry(2));
     }
   }
 }
+
+// Mulai fetch daftar surah
 fetchSurahListWithRetry(2);
-window.addEventListener('popstate', () => { if (!listView.classList.contains('hidden')) return; backToList(); });
+
+// Handle navigasi browser back
+window.addEventListener('popstate', () => {
+  if (!listView.classList.contains('hidden')) return;
+  backBtn.click();
+});
