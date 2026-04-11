@@ -108,7 +108,7 @@ body {
   text-align: center;
 }
 
-/* Tombol kembali ke gaya semula (bukan neumorphism) */
+/* Tombol biasa (bukan neumorphism) */
 .back-btn,
 .audio-btn,
 .btn-toggle-tafsir,
@@ -140,33 +140,31 @@ body {
 }
 .back-btn svg { stroke: #F3E7C0; }
 
-/* === AUDIO PLAYER LAYOUT (RAPI) === */
+/* ===== AUDIO PLAYER (RAPI & SEDERHANA) ===== */
 .audio-player {
   margin-top: 1.2rem;
   width: 100%;
   background: rgba(0, 0, 0, 0.2);
   border-radius: 60px;
-  padding: 10px 16px;
+  padding: 12px 16px;
   backdrop-filter: blur(4px);
   border: 1px solid rgba(212, 175, 106, 0.2);
 }
 
-.player-main-row {
+.player-row {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
 }
 
 /* Tombol Play/Pause Neumorphism Bulat */
-.play-surah-btn {
+.play-btn {
   background: #0e1a2b;
   border: none;
   width: 48px;
   height: 48px;
-  border-radius: 50% !important;
-  padding: 0 !important;
-  font-size: 1.4rem !important;
-  font-weight: 600;
+  border-radius: 50%;
+  font-size: 1.5rem;
   color: #F3E7C0;
   cursor: pointer;
   box-shadow: 5px 5px 12px #040914, -5px -5px 12px #16263f;
@@ -176,23 +174,22 @@ body {
   justify-content: center;
   flex-shrink: 0;
 }
-.play-surah-btn:active {
+.play-btn:active {
   box-shadow: inset 5px 5px 12px #040914, inset -5px -5px 12px #16263f;
   transform: scale(0.96);
   color: #D4AF6A;
 }
 
-/* Slider & Waktu */
-.slider-container {
+.time-slider-container {
   flex: 1;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 .current-time, .duration-time {
   font-size: 0.75rem;
   color: #D4AF6A;
-  min-width: 42px;
+  min-width: 40px;
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
@@ -223,7 +220,6 @@ body {
   cursor: pointer;
 }
 
-/* Qari Row */
 .qari-row {
   margin-top: 10px;
   display: flex;
@@ -367,7 +363,7 @@ body {
   .surah-badge { font-size: 0.65rem; padding: 3px 8px; }
   .arabic-text { font-size: 1.5rem; line-height: 2; word-spacing: 0.1em; }
   .surah-title-arabic { font-size: 1.8rem; }
-  .player-main-row { gap: 8px; }
-  .play-surah-btn { width: 42px; height: 42px; font-size: 1.2rem !important; }
+  .player-row { gap: 8px; }
+  .play-btn { width: 42px; height: 42px; font-size: 1.2rem; }
   .back-btn svg { width: 16px; height: 16px; }
 }
